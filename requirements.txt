@@ -1,0 +1,8 @@
+# Dependencias de la app Semana SST - Clinica San Rafael
+# Instalar: pip install -r requirements.txt
+
+streamlit>=1.40.0
+supabase>=2.7.0
+bcrypt>=4.2.0
+pandas>=2.2.0
+python-dateutil>=2.9.0
