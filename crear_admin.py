@@ -64,7 +64,7 @@ def crear_admin_interactivo():
             print("Operacion cancelada.")
             return
         nuevo_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(12)).decode()
-        database.get_client().table("administradores").update(
+        database.get_client().table("sst_administradores").update(
             {"password_hash": nuevo_hash, "nombre_completo": nombre,
              "correo": correo, "rol": rol}
         ).eq("id", existente["id"]).execute()

@@ -72,25 +72,25 @@ def crear_visitante(datos: dict) -> dict:
         "habeas_data": bool(datos.get("habeas_data", False)),
         "habeas_data_fecha": datetime.now(timezone.utc).isoformat() if datos.get("habeas_data") else None,
     }
-    resp = sb.table("visitantes").insert(payload).execute()
+    resp = sb.table("sst_visitantes").insert(payload).execute()
     return resp.data[0] if resp.data else {}
 
 
 def buscar_visitante_por_cedula(cedula: str) -> Optional[dict]:
     sb = get_client()
-    r = sb.table("visitantes").select("*").eq("cedula", str(cedula).strip()).execute()
+    r = sb.table("sst_visitantes").select("*").eq("cedula", str(cedula).strip()).execute()
     return r.data[0] if r.data else None
 
 
 def buscar_visitante_por_correo(correo: str) -> Optional[dict]:
     sb = get_client()
-    r = sb.table("visitantes").select("*").eq("correo", correo.strip().lower()).execute()
+    r = sb.table("sst_visitantes").select("*").eq("correo", correo.strip().lower()).execute()
     return r.data[0] if r.data else None
 
 
 def obtener_visitante(visitante_id: str) -> Optional[dict]:
     sb = get_client()
-    r = sb.table("visitantes").select("*").eq("id", visitante_id).execute()
+    r = sb.table("sst_visitantes").select("*").eq("id", visitante_id).execute()
     return r.data[0] if r.data else None
 
 
@@ -98,13 +98,13 @@ def actualizar_visitante(visitante_id: str, cambios: dict) -> dict:
     sb = get_client()
     # Filtrar nulos vacios para no sobrescribir
     clean = {k: v for k, v in cambios.items() if v is not None or k == "telefono"}
-    r = sb.table("visitantes").update(clean).eq("id", visitante_id).execute()
+    r = sb.table("sst_visitantes").update(clean).eq("id", visitante_id).execute()
     return r.data[0] if r.data else {}
 
 
 def listar_visitantes(limit: int = 1000, offset: int = 0) -> list[dict]:
     sb = get_client()
-    r = (sb.table("visitantes")
+    r = (sb.table("sst_visitantes")
          .select("*")
          .order("creado_en", desc=True)
          .range(offset, offset + limit - 1)
@@ -114,7 +114,7 @@ def listar_visitantes(limit: int = 1000, offset: int = 0) -> list[dict]:
 
 def eliminar_visitante(visitante_id: str) -> bool:
     sb = get_client()
-    sb.table("visitantes").delete().eq("id", visitante_id).execute()
+    sb.table("sst_visitantes").delete().eq("id", visitante_id).execute()
     return True
 
 
@@ -133,14 +133,14 @@ def guardar_codigo_2fa(visitante_id: str, correo: str, codigo_hash: str,
         "codigo_hash": codigo_hash,
         "expires_at": expira,
     }
-    r = sb.table("codigos_2fa").insert(payload).execute()
+    r = sb.table("sst_codigos_2fa").insert(payload).execute()
     return r.data[0] if r.data else {}
 
 
 def verificar_codigo_2fa(visitante_id: str) -> Optional[dict]:
     """Obtiene el codigo 2FA mas reciente y vigente para el visitante."""
     sb = get_client()
-    r = (sb.table("codigos_2fa")
+    r = (sb.table("sst_codigos_2fa")
          .select("*")
          .eq("visitante_id", visitante_id)
          .eq("usado", False)
@@ -160,16 +160,16 @@ def verificar_codigo_2fa(visitante_id: str) -> Optional[dict]:
 
 def marcar_codigo_usado(codigo_id: str):
     sb = get_client()
-    sb.table("codigos_2fa").update({"usado": True}).eq("id", codigo_id).execute()
+    sb.table("sst_codigos_2fa").update({"usado": True}).eq("id", codigo_id).execute()
 
 
 def incrementar_intento_2fa(codigo_id: str) -> int:
     sb = get_client()
-    r = sb.table("codigos_2fa").select("intentos").eq("id", codigo_id).execute()
+    r = sb.table("sst_codigos_2fa").select("intentos").eq("id", codigo_id).execute()
     if not r.data:
         return 0
     nuevo = (r.data[0].get("intentos") or 0) + 1
-    sb.table("codigos_2fa").update({"intentos": nuevo}).eq("id", codigo_id).execute()
+    sb.table("sst_codigos_2fa").update({"intentos": nuevo}).eq("id", codigo_id).execute()
     return nuevo
 
 
@@ -191,7 +191,7 @@ def guardar_intento_crucigrama(visitante_id: str, respuestas: dict,
         "completado": completado,
         "tiempo_segundos": tiempo_segundos,
     }
-    r = sb.table("intentos_crucigrama").insert(payload).execute()
+    r = sb.table("sst_intentos_crucigrama").insert(payload).execute()
     # Actualizar el estado del visitante
     if completado:
         actualizar_visitante(visitante_id, {
@@ -209,7 +209,7 @@ def guardar_intento_crucigrama(visitante_id: str, respuestas: dict,
 
 def listar_intentos_visitante(visitante_id: str) -> list[dict]:
     sb = get_client()
-    r = (sb.table("intentos_crucigrama")
+    r = (sb.table("sst_intentos_crucigrama")
          .select("*")
          .eq("visitante_id", visitante_id)
          .order("creado_en", desc=True)
@@ -228,7 +228,7 @@ def registrar_acceso(tipo_usuario: str, usuario_ref: str, accion: str,
     """Registra un acceso en la bitacora. No levanta excepciones si falla."""
     try:
         sb = get_client()
-        sb.table("accesos_log").insert({
+        sb.table("sst_accesos_log").insert({
             "tipo_usuario": tipo_usuario,
             "usuario_ref": usuario_ref,
             "correo": correo,
@@ -245,7 +245,7 @@ def registrar_acceso(tipo_usuario: str, usuario_ref: str, accion: str,
 
 def listar_accesos(limit: int = 200) -> list[dict]:
     sb = get_client()
-    r = (sb.table("accesos_log")
+    r = (sb.table("sst_accesos_log")
          .select("*")
          .order("creado_en", desc=True)
          .limit(limit)
@@ -259,14 +259,14 @@ def listar_accesos(limit: int = 200) -> list[dict]:
 
 def buscar_admin_por_usuario(usuario: str) -> Optional[dict]:
     sb = get_client()
-    r = sb.table("administradores").select("*").eq("usuario", usuario.strip()).eq("activo", True).execute()
+    r = sb.table("sst_administradores").select("*").eq("usuario", usuario.strip()).eq("activo", True).execute()
     return r.data[0] if r.data else None
 
 
 def crear_admin(usuario: str, password_hash: str, nombre: str, correo: str,
                 rol: str = "admin") -> dict:
     sb = get_client()
-    r = sb.table("administradores").insert({
+    r = sb.table("sst_administradores").insert({
         "usuario": usuario,
         "password_hash": password_hash,
         "nombre_completo": nombre,
@@ -278,7 +278,7 @@ def crear_admin(usuario: str, password_hash: str, nombre: str, correo: str,
 
 def listar_admins() -> list[dict]:
     sb = get_client()
-    r = sb.table("administradores").select("*").order("creado_en", desc=True).execute()
+    r = sb.table("sst_administradores").select("*").order("creado_en", desc=True).execute()
     return r.data or []
 
 
@@ -288,19 +288,19 @@ def listar_admins() -> list[dict]:
 
 def listar_premios() -> list[dict]:
     sb = get_client()
-    r = sb.table("premios").select("*").order("creado_en", desc=True).execute()
+    r = sb.table("sst_premios").select("*").order("creado_en", desc=True).execute()
     return r.data or []
 
 
 def actualizar_premio(premio_id: str, cambios: dict):
     sb = get_client()
-    sb.table("premios").update(cambios).eq("id", premio_id).execute()
+    sb.table("sst_premios").update(cambios).eq("id", premio_id).execute()
 
 
 def listar_participantes_ruleta() -> list[dict]:
     """Visitantes elegibles para el sorteo (crucigrama completado)."""
     sb = get_client()
-    r = sb.table("visitantes").select("id, cedula, nombre, cargo, correo, empresa, "
+    r = sb.table("sst_visitantes").select("id, cedula, nombre, cargo, correo, empresa, "
                                       "crucigrama_puntaje, crucigrama_resuelto_en, creado_en") \
         .eq("crucigrama_completado", True) \
         .eq("email_validado", True) \
@@ -320,7 +320,7 @@ def guardar_sorteo(premio_id: str, admin_id: str, participantes_total: int,
         "ganador_id": ganador_id,
         "semilla": semilla,
     }
-    r = sb.table("sorteos_ruleta").insert(payload).execute()
+    r = sb.table("sst_sorteos_ruleta").insert(payload).execute()
     # Marcar premio como sorteado
     if r.data:
         actualizar_premio(premio_id, {
@@ -333,7 +333,7 @@ def guardar_sorteo(premio_id: str, admin_id: str, participantes_total: int,
 
 def listar_sorteos() -> list[dict]:
     sb = get_client()
-    r = sb.table("sorteos_ruleta").select("*").order("ejecutado_en", desc=True).execute()
+    r = sb.table("sst_sorteos_ruleta").select("*").order("ejecutado_en", desc=True).execute()
     return r.data or []
 
 
@@ -343,24 +343,24 @@ def listar_sorteos() -> list[dict]:
 
 def listar_cronograma() -> list[dict]:
     sb = get_client()
-    r = sb.table("cronograma").select("*").order("dia, hora_inicio").execute()
+    r = sb.table("sst_cronograma").select("*").order("dia, hora_inicio").execute()
     return r.data or []
 
 
 def crear_cronograma(datos: dict) -> dict:
     sb = get_client()
-    r = sb.table("cronograma").insert(datos).execute()
+    r = sb.table("sst_cronograma").insert(datos).execute()
     return r.data[0] if r.data else {}
 
 
 def actualizar_cronograma(item_id: str, cambios: dict):
     sb = get_client()
-    sb.table("cronograma").update(cambios).eq("id", item_id).execute()
+    sb.table("sst_cronograma").update(cambios).eq("id", item_id).execute()
 
 
 def eliminar_cronograma(item_id: str):
     sb = get_client()
-    sb.table("cronograma").delete().eq("id", item_id).execute()
+    sb.table("sst_cronograma").delete().eq("id", item_id).execute()
 
 
 # ---------------------------------------------------------------------------
@@ -369,13 +369,13 @@ def eliminar_cronograma(item_id: str):
 
 def obtener_configuracion() -> dict:
     sb = get_client()
-    r = sb.table("configuracion").select("*").execute()
+    r = sb.table("sst_configuracion").select("*").execute()
     return {row["clave"]: row["valor"] for row in (r.data or [])}
 
 
 def actualizar_configuracion(clave: str, valor: str):
     sb = get_client()
-    sb.table("configuracion").update({"valor": valor}).eq("clave", clave).execute()
+    sb.table("sst_configuracion").update({"valor": valor}).eq("clave", clave).execute()
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +384,7 @@ def actualizar_configuracion(clave: str, valor: str):
 
 def obtener_estadisticas() -> dict:
     sb = get_client()
-    r = sb.table("visitantes").select("email_validado, crucigrama_completado, habeas_data, empresa").execute()
+    r = sb.table("sst_visitantes").select("email_validado, crucigrama_completado, habeas_data, empresa").execute()
     data = r.data or []
     total = len(data)
     return {

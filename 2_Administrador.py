@@ -730,7 +730,7 @@ def seccion_configuracion():
                     st.error("El nombre es obligatorio.")
                 else:
                     try:
-                        database.get_client().table("premios").insert({
+                        database.get_client().table("sst_premios").insert({
                             "nombre": nombre, "descripcion": descripcion, "estado": "pendiente",
                         }).execute()
                         st.success("Premio creado.")

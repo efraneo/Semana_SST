@@ -68,7 +68,7 @@ def cambiar_password(usuario: str, password_actual: str, password_nuevo: str) ->
     nuevo_hash = bcrypt.hashpw(password_nuevo.encode(), bcrypt.gensalt(12)).decode()
     database.actualizar_visitante  # noqa (evitar import sin uso)
     from . import database as db
-    db.get_client().table("administradores").update(
+    db.get_client().table("sst_administradores").update(
         {"password_hash": nuevo_hash}
     ).eq("id", admin["id"]).execute()
     return True, "Contrasena actualizada con exito."
