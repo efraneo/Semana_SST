@@ -153,4 +153,4 @@ Enfoque mixto balanceado:
 
 ## Licencia
 
-Uso interno - Clinica San Rafael Alta Complejidad SAS
+Uso interno - Clinica San Rafael Alta Complejidad SAS - diseñado por el Ing. Efrain Sarmiento Crespo
