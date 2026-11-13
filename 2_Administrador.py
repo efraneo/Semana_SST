@@ -17,12 +17,13 @@ import secrets as pysecrets
 import time
 from datetime import datetime, date, timedelta
 
+# Permitir importar el paquete sst_app desde la raiz del proyecto
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 import pandas as pd
-from src import styles, database, auth, email_service
-from src.crucigrama_data import generar_resumen_visual
+from sst_app import styles, database, auth, email_service
+from sst_app.crucigrama_data import generar_resumen_visual
 
 
 st.set_page_config(

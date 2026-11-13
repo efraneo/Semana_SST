@@ -10,12 +10,13 @@ from __future__ import annotations
 import sys
 import os
 
-# Asegurar que el paquete src sea importable
+# Asegurar que el paquete sst_app sea importable
+# (importante para Streamlit Cloud donde el repo se monta en /mount/src/)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
-from src import styles, database
-from src.crucigrama_data import generar_resumen_visual
+from sst_app import styles, database
+from sst_app.crucigrama_data import generar_resumen_visual
 
 
 st.set_page_config(

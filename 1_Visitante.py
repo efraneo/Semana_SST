@@ -13,11 +13,12 @@ import time
 import re
 from datetime import datetime, timezone
 
+# Permitir importar el paquete sst_app desde la raiz del proyecto
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
-from src import styles, database, email_service, auth
-from src import crucigrama_data as cw
+from sst_app import styles, database, email_service, auth
+from sst_app import crucigrama_data as cw
 
 
 st.set_page_config(
