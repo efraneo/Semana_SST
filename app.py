@@ -1,8 +1,11 @@
 """
 APP PRINCIPAL - Semana SST - Clinica San Rafael Alta Complejidad SAS
 ====================================================================
-Punto de entrada de Streamlit. Muestra landing con cronograma del evento
-y enlaces a las dos rutas: Visitante y Administrador.
+Punto de entrada de Streamlit. Muestra landing estatica (sin conexion a BD)
+con enlaces a las dos rutas: Visitante y Administrador.
+
+El cronograma y el crucigrama solo se cargan dentro de la sesion del
+visitante autenticado, no en la landing publica.
 
 Ejecucion: streamlit run app.py
 """
@@ -11,15 +14,12 @@ import sys
 import os
 
 # Agregar la carpeta sst_app/ al path para imports directos.
-# Esto es mas robusto que depender del reconocimiento de paquetes
-# (Streamlit Cloud a veces no detecta correctamente carpetas con __init__.py)
 _BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_BASE, "sst_app"))
 sys.path.insert(0, _BASE)
 
 import streamlit as st
 import styles
-import database
 from crucigrama_data import generar_resumen_visual
 
 
@@ -34,8 +34,40 @@ styles.inject_css()
 styles.render_header("Bienvenidos a la Semana de Salud y Seguridad en el Trabajo")
 
 
+# Cronograma estatico de ejemplo (no requiere conexion a BD)
+# El administrador puede editarlo desde su panel, estos son los valores por defecto
+CRONOGRAMA_ESTATICO = [
+    {"dia": "2025-11-17", "hi": "08:00", "hf": "09:00",
+     "actividad": "Inauguracion Semana SST",
+     "desc": "Apertura oficial del evento y presentacion del cronograma",
+     "responsable": "Comite SST", "ubicacion": "Auditorio principal"},
+    {"dia": "2025-11-17", "hi": "09:00", "hf": "11:00",
+     "actividad": "Capacitacion: SG-SST Resolucion 0312",
+     "desc": "Recorrido por los estandares minimos del SG-SST",
+     "responsable": "Coordinador SST", "ubicacion": "Auditorio principal"},
+    {"dia": "2025-11-18", "hi": "10:00", "hf": "12:00",
+     "actividad": "Taller de bioseguridad clinica",
+     "desc": "Manejo de residuos hospitalarios y prevencion de pinchazos",
+     "responsable": "Enfermeria EPS", "ubicacion": "Sala de capacitacion"},
+    {"dia": "2025-11-19", "hi": "14:00", "hf": "16:00",
+     "actividad": "Simulacro de evacuacion",
+     "desc": "Practica de evacuacion y uso de extintores",
+     "responsable": "Brigada de emergencias", "ubicacion": "Todas las sedes"},
+    {"dia": "2025-11-20", "hi": "09:00", "hf": "11:00",
+     "actividad": "Ergonomia en el puesto de trabajo",
+     "desc": "Prevencion de lesiones musculo-esqueleticas",
+     "responsable": "Fisioterapeuta", "ubicacion": "Sala multiusos"},
+    {"dia": "2025-11-21", "hi": "15:00", "hf": "17:00",
+     "actividad": "Cierre y sorteo del premio",
+     "desc": "Entrega de reconocimientos y sorteo entre participantes",
+     "responsable": "Direccion", "ubicacion": "Auditorio principal"},
+]
+
+
 def landing():
-    """Pantalla principal con informacion del evento y botones de acceso."""
+    """Pantalla principal estatica. No se conecta a Supabase.
+    El cronograma y crucigrama solo se cargan en la sesion autenticada."""
+
     st.markdown("""
     <div class="card">
         <h2 class="card-title">🏥 Bienvenidos a la Semana SST</h2>
@@ -78,13 +110,13 @@ def landing():
             </p>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("👉 Ingresar como Administrador", use_container_width=True, key="btn_admin",
-                    type="primary"):
+        if st.button("👉 Ingresar como Administrador", use_container_width=True,
+                    key="btn_admin", type="primary"):
             st.switch_page("pages/2_Administrador.py")
 
     st.markdown("---")
 
-    # Resumen del crucigrama
+    # Resumen del crucigrama (datos estaticos del layout, no requiere BD)
     resumen = generar_resumen_visual()
     st.markdown("""
     <div class="card">
@@ -92,6 +124,7 @@ def landing():
         <p style="color:#1A2332;">
             Pon a prueba tus conocimientos sobre salud y seguridad en el trabajo.
             Resuelve las 20 palabras para participar en el sorteo del premio sorpresa.
+            El crucigrama se desbloquea una vez completes tu registro y valides tu correo.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -109,44 +142,40 @@ def landing():
         st.markdown(f"""<div class="metric-tile"><div class="value">{resumen['total_letras']}</div>
                      <div class="label">Letras</div></div>""", unsafe_allow_html=True)
 
-    # Cronograma del evento (lectura publica)
+    # Cronograma estatico (no consulta a Supabase)
     st.markdown("---")
     st.markdown("""
     <div class="card">
         <h2 class="card-title">📅 Cronograma del Evento</h2>
+        <p style="color:#5F6B7A; font-size:0.9rem; margin:0 0 0.5rem 0;">
+            Agenda tentativa de la Semana SST.
+        </p>
     </div>
     """, unsafe_allow_html=True)
-    try:
-        cronograma = database.listar_cronograma()
-        if cronograma:
-            for item in cronograma:
-                dia = str(item.get("dia", ""))
-                hi = str(item.get("hora_inicio", ""))[:5]
-                hf = str(item.get("hora_fin", ""))[:5]
-                actividad = item.get("actividad", "")
-                desc = item.get("descripcion", "") or ""
-                responsable = item.get("responsable", "") or ""
-                ubicacion = item.get("ubicacion", "") or ""
-                st.markdown(f"""
-                <div class="card" style="padding:1rem 1.25rem; margin-bottom:0.75rem;">
-                    <div style="display:flex; align-items:center; gap:1rem;">
-                        <div style="background:#1565C0; color:white; padding:0.5rem 0.85rem;
-                                    border-radius:10px; text-align:center; min-width:80px;">
-                            <div style="font-size:0.7rem; opacity:0.9;">DIA</div>
-                            <div style="font-size:1.1rem; font-weight:700;">{dia[-2:]}/{dia[5:7]}</div>
-                        </div>
-                        <div style="flex:1;">
-                            <div style="font-weight:700; color:#1565C0; font-size:1rem;">{actividad}</div>
-                            <div style="color:#5F6B7A; font-size:0.85rem;">⏰ {hi} - {hf} &middot; 📍 {ubicacion} &middot; 👤 {responsable}</div>
-                            {f'<div style="color:#1A2332; font-size:0.9rem; margin-top:0.3rem;">{desc}</div>' if desc else ''}
-                        </div>
-                    </div>
+    for item in CRONOGRAMA_ESTATICO:
+        dia = item["dia"]
+        hi = item["hi"]
+        hf = item["hf"]
+        actividad = item["actividad"]
+        desc = item["desc"]
+        responsable = item["responsable"]
+        ubicacion = item["ubicacion"]
+        st.markdown(f"""
+        <div class="card" style="padding:1rem 1.25rem; margin-bottom:0.75rem;">
+            <div style="display:flex; align-items:center; gap:1rem;">
+                <div style="background:#1565C0; color:white; padding:0.5rem 0.85rem;
+                            border-radius:10px; text-align:center; min-width:80px;">
+                    <div style="font-size:0.7rem; opacity:0.9;">DIA</div>
+                    <div style="font-size:1.1rem; font-weight:700;">{dia[-2:]}/{dia[5:7]}</div>
                 </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("El cronograma se publicara proximamente.")
-    except Exception as e:
-        st.warning(f"No se pudo cargar el cronograma: {e}")
+                <div style="flex:1;">
+                    <div style="font-weight:700; color:#1565C0; font-size:1rem;">{actividad}</div>
+                    <div style="color:#5F6B7A; font-size:0.85rem;">⏰ {hi} - {hf} &middot; 📍 {ubicacion} &middot; 👤 {responsable}</div>
+                    <div style="color:#1A2332; font-size:0.9rem; margin-top:0.3rem;">{desc}</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Beneficios e info
     st.markdown("""

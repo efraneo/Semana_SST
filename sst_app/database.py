@@ -19,19 +19,37 @@ except ImportError:  # pragma: no cover
 # ---------------------------------------------------------------------------
 
 def _get_secrets():
-    """Obtiene credenciales desde st.secrets o variables de entorno."""
+    """Obtiene credenciales desde st.secrets o variables de entorno.
+    Soporta varias claves posibles para mayor compatibilidad."""
+    url = None
+    key = None
+    # Intentar primero desde streamlit secrets
     try:
         import streamlit as st
-        sb = st.secrets.get("supabase", {})
-        return {
-            "url": sb.get("url") or os.getenv("SUPABASE_URL"),
-            "key": sb.get("service_key") or os.getenv("SUPABASE_SERVICE_KEY"),
-        }
+        # Probar varias estructuras posibles
+        if "supabase" in st.secrets:
+            sb = st.secrets["supabase"]
+            url = sb.get("url") or sb.get("SUPABASE_URL") or sb.get("supabase_url")
+            key = (sb.get("service_key") or sb.get("service_role_key")
+                   or sb.get("SERVICE_KEY") or sb.get("SUPABASE_SERVICE_KEY")
+                   or sb.get("key") or sb.get("supabase_key"))
+        # Tambien soportar claves planas en st.secrets
+        if not url:
+            url = st.secrets.get("SUPABASE_URL") or st.secrets.get("supabase_url")
+        if not key:
+            key = (st.secrets.get("SUPABASE_SERVICE_KEY")
+                   or st.secrets.get("supabase_service_key")
+                   or st.secrets.get("SUPABASE_KEY"))
     except Exception:
-        return {
-            "url": os.getenv("SUPABASE_URL"),
-            "key": os.getenv("SUPABASE_SERVICE_KEY"),
-        }
+        pass
+    # Fallback a variables de entorno
+    if not url:
+        url = os.getenv("SUPABASE_URL") or os.getenv("supabase_url")
+    if not key:
+        key = (os.getenv("SUPABASE_SERVICE_KEY")
+               or os.getenv("supabase_service_key")
+               or os.getenv("SUPABASE_KEY"))
+    return {"url": url, "key": key}
 
 
 _cliente: Optional["Client"] = None
