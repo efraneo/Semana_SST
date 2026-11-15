@@ -4,7 +4,7 @@ Encapsula todas las operaciones CRUD y consultas.
 """
 from __future__ import annotations
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Optional
 
 try:
@@ -233,6 +233,87 @@ def listar_intentos_visitante(visitante_id: str) -> list[dict]:
          .order("creado_en", desc=True)
          .execute())
     return r.data or []
+
+
+# ---------------------------------------------------------------------------
+# Guardado / carga de progreso del crucigrama (borrador)
+# ---------------------------------------------------------------------------
+
+def guardar_progreso_crucigrama(visitante_id: str, respuestas: dict,
+                                  palabras_completadas: int = 0,
+                                  total_palabras: int = 20) -> dict:
+    """Guarda el progreso parcial del crucigrama (borrador).
+    Si ya existe un borrador para el visitante, lo actualiza."""
+    sb = get_client()
+    # Buscar si ya existe un borrador
+    existente = (sb.table("sst_intentos_crucigrama")
+                 .select("*")
+                 .eq("visitante_id", visitante_id)
+                 .eq("completado", False)
+                 .order("creado_en", desc=True)
+                 .limit(1)
+                 .execute())
+    payload = {
+        "respuestas": respuestas,
+        "aciertos": palabras_completadas,
+        "total_palabras": total_palabras,
+        "puntaje": int(round((palabras_completadas / total_palabras) * 100)) if total_palabras else 0,
+        "completado": False,
+    }
+    if existente.data:
+        # Actualizar el borrador existente
+        r = sb.table("sst_intentos_crucigrama").update(payload).eq(
+            "id", existente.data[0]["id"]
+        ).execute()
+        return r.data[0] if r.data else {}
+    else:
+        # Crear nuevo borrador
+        payload["visitante_id"] = visitante_id
+        r = sb.table("sst_intentos_crucigrama").insert(payload).execute()
+        return r.data[0] if r.data else {}
+
+
+def cargar_progreso_crucigrama(visitante_id: str) -> Optional[dict]:
+    """Carga el borrador mas reciente del crucigrama del visitante.
+    Retorna None si no hay borrador o si ya completo el crucigrama."""
+    sb = get_client()
+    r = (sb.table("sst_intentos_crucigrama")
+         .select("*")
+         .eq("visitante_id", visitante_id)
+         .eq("completado", False)
+         .order("creado_en", desc=True)
+         .limit(1)
+         .execute())
+    return r.data[0] if r.data else None
+
+
+def obtener_ultimo_intento(visitante_id: str) -> Optional[dict]:
+    """Obtiene el ultimo intento del visitante, sea completado o no."""
+    sb = get_client()
+    r = (sb.table("sst_intentos_crucigrama")
+         .select("*")
+         .eq("visitante_id", visitante_id)
+         .order("creado_en", desc=True)
+         .limit(1)
+         .execute())
+    return r.data[0] if r.data else None
+
+
+# ---------------------------------------------------------------------------
+# Fecha limite del evento
+# ---------------------------------------------------------------------------
+
+def fecha_limite_crucigrama() -> datetime:
+    """Retorna la fecha limite para completar el crucigrama:
+    20 de noviembre de 2026 a las 14:00 (hora Colombia)."""
+    from datetime import datetime as dt
+    # America/Bogota = UTC-5
+    return dt(2026, 11, 20, 14, 0, 0, tzinfo=timezone(timedelta(hours=-5)))
+
+
+def crucigrama_aun_vigente() -> bool:
+    """Indica si el visitante aun puede completar el crucigrama."""
+    return datetime.now(timezone.utc) < fecha_limite_crucigrama()
 
 
 # ---------------------------------------------------------------------------

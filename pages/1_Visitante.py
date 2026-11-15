@@ -2,16 +2,23 @@
 PAGINA 1 - VISITANTE
 ====================
 Flujo completo del visitante:
-  Paso 1: Registro de datos personales + consentimiento habeas data
+  Paso 1: Login / Registro por cedula + datos personales + habeas data
   Paso 2: Validacion 2FA via correo electronico
-  Paso 3: Resolucion del crucigrama SST (20 palabras)
+  Paso 3: Resolucion del crucigrama SST (20 palabras) - guardado automatico
+  Paso 4: Crucigrama completado (inscrito en la ruleta)
+
+Caracteristicas:
+  - Visitante puede reingresar con su cedula para continuar el crucigrama
+  - El progreso se guarda automaticamente en Supabase
+  - Fecha limite: 20 de noviembre de 2026 a las 2:00 pm (hora Colombia)
+  - Solo al completar el crucigrama 100% queda inscrito en la ruleta
 """
 from __future__ import annotations
 import sys
 import os
 import time
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Agregar la carpeta sst_app/ al path para imports directos
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,15 +50,18 @@ styles.render_header("Registro de Visitante - Semana SST")
 def init_state():
     s = st.session_state
     defaults = {
-        "visitante_paso": 1,        # 1:registro, 2:2FA, 3:crucigrama, 4:finalizado
+        "visitante_paso": 1,        # 1:login/registro, 2:2FA, 3:crucigrama, 4:finalizado
         "visitante_id": None,
         "visitante_nombre": "",
         "visitante_correo": "",
+        "visitante_email_validado": False,
+        "visitante_crucigrama_completado": False,
         "2fa_codigo_id": None,
         "2fa_intentos": 0,
         "2fa_reenviado_en": 0,
         "crucigrama_respuestas": {},
         "crucigrama_inicio": None,
+        "crucigrama_resultado": None,
     }
     for k, v in defaults.items():
         if k not in s:
@@ -72,116 +82,179 @@ def validar_cedula(cedula: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# PASO 1: Registro
+# PASO 1: Login / Registro por cedula
 # ---------------------------------------------------------------------------
-def paso_registro():
-    st.markdown('<h2 class="card-title">📝 Paso 1: Registro del Visitante</h2>',
+def paso_login_registro():
+    st.markdown('<h2 class="card-title">📝 Paso 1: Identificacion del Visitante</h2>',
                 unsafe_allow_html=True)
-    styles.render_stepper(["Registro", "Verificacion", "Crucigrama", "Listo"], 0)
+    styles.render_stepper(["Identificacion", "Verificacion", "Crucigrama", "Listo"], 0)
 
     st.markdown("""
     <div class="alert-info">
-        Completa tus datos personales para iniciar el registro en la Semana SST.
-        Te enviaremos un codigo de verificacion a tu correo.
+        Si ya te registraste anteriormente, ingresa tu cedula para continuar
+        con tu crucigrama donde lo dejaste. Si es tu primera vez, completa
+        tus datos para registrarte.
     </div>
     """, unsafe_allow_html=True)
 
-    with st.form("form_registro", clear_on_submit=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            cedula = st.text_input("Numero de cedula *", max_chars=12,
-                                    help="Entre 6 y 12 digitos, sin puntos ni espacios.")
-            nombre = st.text_input("Nombre completo *", max_chars=120,
-                                    help="Nombres y apellidos completos.")
-            cargo = st.text_input("Cargo / Rol *", max_chars=80,
-                                   help="Tu cargo actual o rol en la empresa.")
-        with col2:
-            correo = st.text_input("Correo electronico *", max_chars=120,
-                                    help="Correo donde recibiras el codigo 2FA.",
-                                    placeholder="ejemplo@dominio.com")
-            telefono = st.text_input("Telefono celular (opcional)", max_chars=20,
-                                       help="Solo digitos y el simbolo +.")
-            empresa = st.text_input("Empresa / Institucion *", max_chars=120,
-                                     help="Empresa o institucion a la que perteneces.")
+    # Pestañas: Login vs Registro
+    tab_login, tab_registro = st.tabs(["🔄 Ya estoy registrado", "📝 Primera vez"])
 
-        # Habeas data
-        st.markdown("""
-        <div class="habeas-box">
-            <strong>AUTORIZACION PARA EL TRATAMIENTO DE DATOS PERSONALES (HABEAS DATA)</strong><br><br>
-            De conformidad con la Ley 1581 de 2012, el Decreto 1377 de 2013 y la
-            Politica de Tratamiento de Datos Personales de la <strong>Clinica San Rafael
-            Alta Complejidad SAS</strong>, autorizo de manera libre, previa, expresa,
-            voluntaria e inequívoca a la Clinica para que recolecte, almacene, use,
-            circule y trate mis datos personales con la finalidad de: (i) registrar mi
-            participacion en la Semana SST, (ii) realizar el seguimiento a las
-            actividades del evento, (iii) contactarme para fines relacionados con el
-            evento y la divulgacion de contenido SST, y (iv) registrar el resultado de
-            mi actividad en el crucigrama y mi participacion en el sorteo del premio.
-            <br><br>
-            Entiendo que como titular de los datos tengo derecho a conocer, actualizar,
-            rectificar y suprimir mi informacion personal. Esta autorizacion se otorga
-            por el termino de duracion del evento y mientras se cumplan las finalidades
-            descritas.
-        </div>
-        """, unsafe_allow_html=True)
-        habeas = st.checkbox("Acepto la autorizacion para el tratamiento de mis datos personales.",
-                            value=False, key="habeas_chk")
-        enviar = st.form_submit_button("Continuar", use_container_width=True, type="primary")
+    # ---- TAB LOGIN ----
+    with tab_login:
+        with st.form("form_login_visitante"):
+            cedula_login = st.text_input("Numero de cedula *", max_chars=12,
+                                          help="Ingresa la cedula con la que te registraste.",
+                                          key="cedula_login")
+            if st.form_submit_button("Continuar crucigrama", use_container_width=True,
+                                       type="primary"):
+                if not validar_cedula(cedula_login):
+                    st.error("La cedula debe tener entre 6 y 12 digitos numericos.")
+                else:
+                    try:
+                        visitante = database.buscar_visitante_por_cedula(cedula_login)
+                    except Exception as e:
+                        st.error(f"Error de conexion: {e}")
+                        return
+                    if not visitante:
+                        st.error("No encontramos un registro con esa cedula. "
+                                 "Si es tu primera vez, usa la pestana 'Primera vez'.")
+                    else:
+                        # Cargar estado del visitante
+                        st.session_state.visitante_id = visitante["id"]
+                        st.session_state.visitante_nombre = visitante.get("nombre", "")
+                        st.session_state.visitante_correo = visitante.get("correo", "")
+                        st.session_state.visitante_email_validado = bool(
+                            visitante.get("email_validado", False))
+                        st.session_state.visitante_crucigrama_completado = bool(
+                            visitante.get("crucigrama_completado", False))
 
-    if enviar:
-        errores = []
-        if not validar_cedula(cedula):
-            errores.append("La cedula debe tener entre 6 y 12 digitos numericos.")
-        if not nombre.strip():
-            errores.append("El nombre es obligatorio.")
-        if not cargo.strip():
-            errores.append("El cargo es obligatorio.")
-        if not validar_correo(correo):
-            errores.append("El correo electronico no es valido.")
-        if not empresa.strip():
-            errores.append("La empresa es obligatoria.")
-        if not habeas:
-            errores.append("Debes aceptar la autorizacion de habeas data para continuar.")
+                        # Si ya completo el crucigrama
+                        if st.session_state.visitante_crucigrama_completado:
+                            st.session_state.visitante_paso = 4
+                            st.success(f"Bienvenido de nuevo, {visitante.get('nombre','')}. "
+                                       "Ya completaste el crucigrama.")
+                            time.sleep(1)
+                            st.rerun()
+                        # Si el email no esta validado, ir a 2FA
+                        elif not st.session_state.visitante_email_validado:
+                            st.session_state.visitante_paso = 2
+                            st.info(f"Bienvenido de nuevo. Tu correo aun no esta validado. "
+                                    f"Te enviaremos un codigo a {visitante.get('correo','')}.")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            # Cargar progreso del crucigrama
+                            _cargar_progreso_guardado()
+                            st.session_state.visitante_paso = 3
+                            st.success(f"Bienvenido de nuevo, {visitante.get('nombre','')}. "
+                                       "Cargaremos tu progreso guardado.")
+                            time.sleep(1)
+                            st.rerun()
 
-        # Verificar duplicados
-        if validar_cedula(cedula):
+    # ---- TAB REGISTRO ----
+    with tab_registro:
+        with st.form("form_registro", clear_on_submit=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                cedula = st.text_input("Numero de cedula *", max_chars=12,
+                                        help="Entre 6 y 12 digitos, sin puntos ni espacios.",
+                                        key="cedula_registro")
+                nombre = st.text_input("Nombre completo *", max_chars=120,
+                                        help="Nombres y apellidos completos.")
+                cargo = st.text_input("Cargo / Rol *", max_chars=80,
+                                       help="Tu cargo actual o rol en la empresa.")
+            with col2:
+                correo = st.text_input("Correo electronico *", max_chars=120,
+                                        help="Correo donde recibiras el codigo 2FA.",
+                                        placeholder="ejemplo@dominio.com")
+                telefono = st.text_input("Telefono celular (opcional)", max_chars=20,
+                                           help="Solo digitos y el simbolo +.")
+                empresa = st.text_input("Empresa / Institucion *", max_chars=120,
+                                         help="Empresa o institucion a la que perteneces.")
+
+            # Habeas data
+            st.markdown("""
+            <div class="habeas-box">
+                <strong>AUTORIZACION PARA EL TRATAMIENTO DE DATOS PERSONALES (HABEAS DATA)</strong><br><br>
+                De conformidad con la Ley 1581 de 2012, el Decreto 1377 de 2013 y la
+                Politica de Tratamiento de Datos Personales de la <strong>Clinica San Rafael
+                Alta Complejidad SAS</strong>, autorizo de manera libre, previa, expresa,
+                voluntaria e inequivoca a la Clinica para que recolecte, almacene, use,
+                circule y trate mis datos personales con la finalidad de: (i) registrar mi
+                participacion en la Semana SST, (ii) realizar el seguimiento a las
+                actividades del evento, (iii) contactarme para fines relacionados con el
+                evento y la divulgacion de contenido SST, y (iv) registrar el resultado de
+                mi actividad en el crucigrama y mi participacion en el sorteo del premio.
+                <br><br>
+                Entiendo que como titular de los datos tengo derecho a conocer, actualizar,
+                rectificar y suprimir mi informacion personal. Esta autorizacion se otorga
+                por el termino de duracion del evento y mientras se cumplan las finalidades
+                descritas.
+            </div>
+            """, unsafe_allow_html=True)
+            habeas = st.checkbox("Acepto la autorizacion para el tratamiento de mis datos personales.",
+                                value=False, key="habeas_chk")
+            enviar = st.form_submit_button("Registrarme", use_container_width=True,
+                                             type="primary")
+
+        if enviar:
+            errores = []
+            if not validar_cedula(cedula):
+                errores.append("La cedula debe tener entre 6 y 12 digitos numericos.")
+            if not nombre.strip():
+                errores.append("El nombre es obligatorio.")
+            if not cargo.strip():
+                errores.append("El cargo es obligatorio.")
+            if not validar_correo(correo):
+                errores.append("El correo electronico no es valido.")
+            if not empresa.strip():
+                errores.append("La empresa es obligatoria.")
+            if not habeas:
+                errores.append("Debes aceptar la autorizacion de habeas data para continuar.")
+
+            # Verificar duplicados
+            if validar_cedula(cedula):
+                try:
+                    if database.buscar_visitante_por_cedula(cedula):
+                        errores.append("Ya existe un registro con esta cedula. "
+                                       "Usa la pestana 'Ya estoy registrado'.")
+                except Exception:
+                    pass
+            if validar_correo(correo):
+                try:
+                    if database.buscar_visitante_por_correo(correo):
+                        errores.append("Ya existe un registro con este correo. "
+                                       "Usa la pestana 'Ya estoy registrado'.")
+                except Exception:
+                    pass
+
+            if errores:
+                for e in errores:
+                    st.error(e)
+                return
+
+            # Guardar visitante
             try:
-                if database.buscar_visitante_por_cedula(cedula):
-                    errores.append("Ya existe un registro con esta cedula.")
-            except Exception:
-                pass
-        if validar_correo(correo):
-            try:
-                if database.buscar_visitante_por_correo(correo):
-                    errores.append("Ya existe un registro con este correo.")
-            except Exception:
-                pass
+                visitante = database.crear_visitante({
+                    "cedula": cedula, "nombre": nombre, "cargo": cargo,
+                    "correo": correo, "telefono": telefono, "empresa": empresa,
+                    "habeas_data": True,
+                })
+            except Exception as e:
+                st.error(f"Error al registrar: {e}")
+                return
 
-        if errores:
-            for e in errores:
-                st.error(e)
-            return
+            st.session_state.visitante_id = visitante["id"]
+            st.session_state.visitante_nombre = nombre.upper()
+            st.session_state.visitante_correo = correo.strip().lower()
+            st.session_state.visitante_email_validado = False
+            st.session_state.visitante_paso = 2
 
-        # Guardar visitante
-        try:
-            visitante = database.crear_visitante({
-                "cedula": cedula, "nombre": nombre, "cargo": cargo,
-                "correo": correo, "telefono": telefono, "empresa": empresa,
-                "habeas_data": True,
-            })
-        except Exception as e:
-            st.error(f"Error al registrar: {e}")
-            return
-
-        st.session_state.visitante_id = visitante["id"]
-        st.session_state.visitante_nombre = nombre.upper()
-        st.session_state.visitante_correo = correo.strip().lower()
-        st.session_state.visitante_paso = 2
-
-        # Bitacora
-        database.registrar_acceso("visitante", cedula, "registro_visitante",
-                                  correo=correo, exitoso=True)
-        st.rerun()
+            # Bitacora
+            database.registrar_acceso("visitante", cedula, "registro_visitante",
+                                      correo=correo, exitoso=True)
+            st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +263,7 @@ def paso_registro():
 def paso_2fa():
     st.markdown('<h2 class="card-title">🔐 Paso 2: Verificacion por Correo</h2>',
                 unsafe_allow_html=True)
-    styles.render_stepper(["Registro", "Verificacion", "Crucigrama", "Listo"], 1)
+    styles.render_stepper(["Identificacion", "Verificacion", "Crucigrama", "Listo"], 1)
 
     st.markdown(f"""
     <div class="alert-info">
@@ -285,6 +358,9 @@ def _validar_2fa(codigo_ingresado: str):
         database.registrar_acceso("visitante", st.session_state.get("visitante_id", ""),
                                     "2fa_ok", correo=st.session_state.visitante_correo,
                                     exitoso=True)
+        st.session_state.visitante_email_validado = True
+        # Cargar progreso si existe
+        _cargar_progreso_guardado()
         st.session_state.visitante_paso = 3
         st.session_state.crucigrama_inicio = time.time()
         st.success("Correo verificado correctamente.")
@@ -307,17 +383,72 @@ def _validar_2fa(codigo_ingresado: str):
 
 
 # ---------------------------------------------------------------------------
-# PASO 3: Crucigrama
+# Carga de progreso guardado
+# ---------------------------------------------------------------------------
+def _cargar_progreso_guardado():
+    """Carga el progreso del crucigrama desde Supabase (si existe)."""
+    try:
+        progreso = database.cargar_progreso_crucigrama(st.session_state.visitante_id)
+        if progreso and progreso.get("respuestas"):
+            respuestas = progreso["respuestas"]
+            # Las respuestas vienen como dict desde JSONB
+            if isinstance(respuestas, str):
+                import json
+                respuestas = json.loads(respuestas)
+            st.session_state.crucigrama_respuestas = respuestas
+            st.session_state.crucigrama_inicio = time.time()
+    except Exception as e:
+        print(f"[WARN] No se pudo cargar progreso: {e}")
+
+
+# ---------------------------------------------------------------------------
+# PASO 3: Crucigrama (con guardado automatico)
 # ---------------------------------------------------------------------------
 def paso_crucigrama():
     st.markdown('<h2 class="card-title">🧩 Paso 3: Crucigrama SST (20 palabras)</h2>',
                 unsafe_allow_html=True)
-    styles.render_stepper(["Registro", "Verificacion", "Crucigrama", "Listo"], 2)
+    styles.render_stepper(["Identificacion", "Verificacion", "Crucigrama", "Listo"], 2)
+
+    # Verificar fecha limite
+    try:
+        vigente = database.crucigrama_aun_vigente()
+        fecha_limite = database.fecha_limite_crucigrama()
+    except Exception:
+        vigente = True
+        fecha_limite = None
+
+    # Calcular tiempo restante
+    if fecha_limite:
+        ahora = datetime.now(timezone(timedelta(hours=-5)))
+        tiempo_restante = fecha_limite - ahora
+        dias = tiempo_restante.days
+        horas = tiempo_restante.seconds // 3600
+        minutos = (tiempo_restante.seconds % 3600) // 60
+        if vigente:
+            st.markdown(f"""
+            <div class="alert-info">
+                <strong>⏰ Tiempo restante:</strong> {dias} dias, {horas} horas y {minutos} minutos.
+                Tienes hasta el <strong>20 de noviembre de 2026 a las 2:00 pm</strong>
+                (hora Colombia) para completar el crucigrama.
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="alert-danger">
+                <strong>⏰ Tiempo agotado:</strong> El plazo para completar el crucigrama
+                vencio el 20 de noviembre de 2026 a las 2:00 pm. Ya no puedes modificar
+                tus respuestas.
+            </div>
+            """, unsafe_allow_html=True)
+            # Mostrar progreso final pero sin permitir editar
+            _mostrar_crucigrama_solo_lectura()
+            return
 
     st.markdown("""
     <div class="alert-info">
-        Resuelve el crucigrama digitando las letras en cada casilla. Puedes resolver
-        en cualquier orden. Cuando completes las 20 palabras con el 100% de aciertos,
+        Resuelve el crucigrama digitando las letras en cada casilla. Tu progreso se
+        <strong>guarda automaticamente</strong> en cada cambio, puedes salir y volver
+        cuando quieras. Cuando completes las 20 palabras con el 100% de aciertos,
         quedas automaticamente inscrito en el sorteo del premio sorpresa.
     </div>
     """, unsafe_allow_html=True)
@@ -363,7 +494,7 @@ def paso_crucigrama():
     st.markdown("---")
     st.markdown('<h3 style="color:#0D47A1;">🎯 Tu Crucigrama</h3>', unsafe_allow_html=True)
 
-    # Renderizar grid
+    # Renderizar grid visual
     respuestas = st.session_state.crucigrama_respuestas
     html_grid = '<div class="crossword-wrapper"><div class="crossword-grid" style="grid-template-columns: repeat(' + str(cols) + ', auto);">'
     for i in range(filas):
@@ -383,49 +514,58 @@ def paso_crucigrama():
     html_grid += "</div></div>"
     st.markdown(html_grid, unsafe_allow_html=True)
 
-    # Inputs ocultos via streamlit para capturar valores (ya que HTML puro no se captura)
-    # Solucion: usar st.text_input en una matriz
     st.markdown("""
     <div class="alert-warning" style="margin-top:1rem;">
         <strong>📖 Instrucciones:</strong> Digita cada letra en el cuadro correspondiente.
         Usa las pistas de arriba para resolver las palabras horizontales (➡️) y verticales (⬇️).
-        Cuando termines, presiona el boton "Verificar respuestas".
+        Tu progreso se guarda automaticamente. Cuando termines, presiona "Verificar respuestas".
     </div>
     """, unsafe_allow_html=True)
 
-    # Formulario de captura (invisible pero funcional)
+    # Formulario de captura
     _render_inputs_crucigrama(grid, filas, cols, respuestas)
 
-    # Boton verificar
-    col1, col2, col3 = st.columns([2, 1, 1])
+    # Botones de accion
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     with col1:
         if st.button("✅ Verificar respuestas", use_container_width=True, type="primary"):
             _verificar_crucigrama()
     with col2:
-        if st.button("🧹 Limpiar"):
-            st.session_state.crucigrama_respuestas = {}
-            st.rerun()
+        if st.button("💾 Guardar progreso", use_container_width=True):
+            _guardar_progreso_manual()
     with col3:
-        if st.button("🏠 Inicio"):
-            _reset_state()
+        if st.button("🧹 Limpiar", use_container_width=True):
+            if st.session_state.get("_confirmar_limpiar"):
+                st.session_state.crucigrama_respuestas = {}
+                st.session_state["_confirmar_limpiar"] = False
+                _guardar_progreso_automatico()
+                st.success("Crucigrama limpiado.")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.session_state["_confirmar_limpiar"] = True
+                st.warning("Presiona nuevamente para confirmar.")
+    with col4:
+        if st.button("🏠 Salir", use_container_width=True):
+            # Guardar antes de salir
+            _guardar_progreso_automatico()
+            _reset_sesion_parcial()
             st.switch_page("app.py")
 
 
 def _render_inputs_crucigrama(grid, filas, cols, respuestas):
-    """Renderiza inputs de texto para capturar las letras del visitante.
-    El grid visual arriba es solo referencial; estos inputs son los reales."""
+    """Renderiza inputs de texto para capturar las letras del visitante."""
     st.markdown("""
     <div class="card" style="margin-top:1rem;">
         <h4 style="color:#0D47A1; margin:0 0 0.5rem 0;">✍️ Ingresa tus respuestas por palabra</h4>
         <p style="color:#5F6B7A; font-size:0.85rem; margin:0 0 1rem 0;">
             Cada cuadro corresponde a una palabra del crucigrama (numerada segun las pistas).
-            Digita las letras en orden (sin espacios).
+            Digita las letras en orden (sin espacios). Tu progreso se guarda solo.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
     palabras_orden = cw.palabras_ordenadas()
-    # Mostrar en columnas para que sea mas compacto en movil
     n = len(palabras_orden)
     cols_per_row = 2
     for idx in range(0, n, cols_per_row):
@@ -434,9 +574,8 @@ def _render_inputs_crucigrama(grid, filas, cols, respuestas):
         for k, p in enumerate(chunk):
             with cks[k]:
                 clave = f"cw_{p['numero']}_{p['direccion']}"
-                # Inicializar con valor previo
-                valor_actual = ""
                 # Reconstruir valor desde respuestas almacenadas
+                valor_actual = ""
                 for i in range(len(p["palabra"])):
                     if p["direccion"] == "H":
                         key = f"{p['fila']},{p['col'] + i}"
@@ -457,6 +596,54 @@ def _render_inputs_crucigrama(grid, filas, cols, respuestas):
                     letra = valor[i] if i < len(valor) else ""
                     respuestas[key] = letra
 
+    # Guardado automatico al final del render
+    _guardar_progreso_automatico()
+
+
+def _guardar_progreso_automatico():
+    """Guarda el progreso del crucigrama en Supabase (silencioso)."""
+    try:
+        respuestas = st.session_state.crucigrama_respuestas
+        if not respuestas:
+            return
+        # Contar palabras completas
+        resultado_parcial = cw.validar_respuestas(respuestas)
+        palabras_completadas = resultado_parcial["aciertos"]
+        database.guardar_progreso_crucigrama(
+            visitante_id=st.session_state.visitante_id,
+            respuestas=respuestas,
+            palabras_completadas=palabras_completadas,
+            total_palabras=resultado_parcial["total"],
+        )
+    except Exception as e:
+        # El guardado automatico no debe romper la UI
+        print(f"[WARN] No se pudo guardar progreso automatico: {e}")
+
+
+def _guardar_progreso_manual():
+    """Guardado explicito con feedback visible al usuario."""
+    try:
+        respuestas = st.session_state.crucigrama_respuestas
+        if not respuestas:
+            st.warning("No hay respuestas para guardar.")
+            return
+        resultado_parcial = cw.validar_respuestas(respuestas)
+        palabras_completadas = resultado_parcial["aciertos"]
+        database.guardar_progreso_crucigrama(
+            visitante_id=st.session_state.visitante_id,
+            respuestas=respuestas,
+            palabras_completadas=palabras_completadas,
+            total_palabras=resultado_parcial["total"],
+        )
+        database.registrar_acceso("visitante", st.session_state.visitante_id,
+                                   "crucigrama_guardado_manual",
+                                   correo=st.session_state.visitante_correo,
+                                   detalle=f"palabras correctas: {palabras_completadas}/20",
+                                   exitoso=True)
+        st.success(f"💾 Progreso guardado. Llevas {palabras_completadas}/20 palabras correctas.")
+    except Exception as e:
+        st.error(f"Error guardando progreso: {e}")
+
 
 def _verificar_crucigrama():
     respuestas = st.session_state.crucigrama_respuestas
@@ -466,10 +653,19 @@ def _verificar_crucigrama():
         st.warning("No has digitado ninguna respuesta. Completa el crucigrama e intenta de nuevo.")
         return
 
+    # Verificar fecha limite
+    try:
+        if not database.crucigrama_aun_vigente():
+            st.error("El plazo para completar el crucigrama vencio el 20 de noviembre de 2026 "
+                     "a las 2:00 pm. Ya no puedes verificar respuestas.")
+            return
+    except Exception:
+        pass
+
     resultado = cw.validar_respuestas(respuestas_clean)
     tiempo_total = int(time.time() - st.session_state.crucigrama_inicio) if st.session_state.crucigrama_inicio else None
 
-    # Guardar intento
+    # Guardar intento (esto marcara completado=True si acierta todas)
     try:
         database.guardar_intento_crucigrama(
             visitante_id=st.session_state.visitante_id,
@@ -494,6 +690,7 @@ def _verificar_crucigrama():
         st.success(f"¡Felicitaciones! Has completado el crucigrama al 100% "
                     f"({resultado['aciertos']}/{resultado['total']}).")
         st.session_state.visitante_paso = 4
+        st.session_state.visitante_crucigrama_completado = True
         st.session_state.crucigrama_resultado = resultado
         time.sleep(1.5)
         st.rerun()
@@ -509,13 +706,34 @@ def _verificar_crucigrama():
                             f"&middot; Tu respuesta: `{pal['respuesta_visitante'] or '(vacia)'}`")
 
 
+def _mostrar_crucigrama_solo_lectura():
+    """Muestra el crucigrama en modo solo lectura (plazo vencido)."""
+    respuestas = st.session_state.crucigrama_respuestas
+    grid = cw.obtener_grid()
+    filas, cols = cw.obtener_dimensiones()
+    if not respuestas:
+        st.info("No tenias progreso guardado al vencerse el plazo.")
+        return
+    resultado = cw.validar_respuestas(respuestas)
+    st.markdown(f"""
+    <div class="card">
+        <h3 style="color:#1565C0;">📊 Tu resultado final</h3>
+        <p>Aciertos: <strong>{resultado['aciertos']}/{resultado['total']}</strong>
+        ({resultado['puntaje']}%)</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if not resultado["completado"]:
+        st.info("No completaste el crucigrama al 100%, por lo tanto no quedaste "
+                "inscrito en la ruleta del premio.")
+
+
 # ---------------------------------------------------------------------------
 # PASO 4: Finalizado
 # ---------------------------------------------------------------------------
 def paso_finalizado():
     st.markdown('<h2 class="card-title">🎉 ¡Listo! Crucigrama Completado</h2>',
                 unsafe_allow_html=True)
-    styles.render_stepper(["Registro", "Verificacion", "Crucigrama", "Listo"], 3)
+    styles.render_stepper(["Identificacion", "Verificacion", "Crucigrama", "Listo"], 3)
     resultado = st.session_state.get("crucigrama_resultado", {})
     puntaje = resultado.get("puntaje", 100)
     aciertos = resultado.get("aciertos", 20)
@@ -527,7 +745,7 @@ def paso_finalizado():
         Has completado el crucigrama con <strong>{aciertos}/{total}</strong> aciertos
         ({puntaje}% de efectividad). Quedas automaticamente inscrito en el sorteo
         del <strong>premio sorpresa</strong> que se realizara en la sesion de cierre
-        del evento.
+        del evento el <strong>20 de noviembre de 2026 a las 2:00 pm</strong>.
     </div>
     """, unsafe_allow_html=True)
 
@@ -538,20 +756,32 @@ def paso_finalizado():
         sorteo. La ruleta se ejecutara en vivo durante la sesion de cierre, frente a
         todos los asistentes, para garantizar transparencia.</p>
         <p>Recuerda asistir al cierre del evento para presenciar el sorteo.
-        Si resultas ganador, recibirás una notificacion por correo al termino del sorteo.</p>
+        Si resultas ganador, recibiras una notificacion por correo al termino del sorteo.</p>
     </div>
     """, unsafe_allow_html=True)
 
     if st.button("🏠 Volver al inicio", use_container_width=True):
-        _reset_state()
+        _reset_sesion_parcial()
         st.switch_page("app.py")
 
 
 def _reset_state():
-    """Limpia el estado del visitante."""
+    """Limpia completamente el estado del visitante."""
     keys = ["visitante_paso", "visitante_id", "visitante_nombre", "visitante_correo",
+            "visitante_email_validado", "visitante_crucigrama_completado",
             "2fa_codigo_id", "2fa_intentos", "2fa_reenviado_en",
-            "crucigrama_respuestas", "crucigrama_inicio", "crucigrama_resultado"]
+            "crucigrama_respuestas", "crucigrama_inicio", "crucigrama_resultado",
+            "_confirmar_limpiar"]
+    for k in keys:
+        if k in st.session_state:
+            del st.session_state[k]
+
+
+def _reset_sesion_parcial():
+    """Limpia solo datos de sesion pero mantiene al visitante identificado
+    para que al volver a entrar con su cedula, pueda continuar."""
+    keys = ["visitante_paso", "2fa_codigo_id", "2fa_intentos", "2fa_reenviado_en",
+            "crucigrama_inicio", "crucigrama_resultado", "_confirmar_limpiar"]
     for k in keys:
         if k in st.session_state:
             del st.session_state[k]
@@ -563,7 +793,7 @@ def _reset_state():
 def main():
     paso = st.session_state.visitante_paso
     if paso == 1:
-        paso_registro()
+        paso_login_registro()
     elif paso == 2:
         paso_2fa()
     elif paso == 3:
