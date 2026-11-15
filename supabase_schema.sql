@@ -203,9 +203,9 @@ CREATE TABLE sst_configuracion (
 );
 
 INSERT INTO sst_configuracion (clave, valor, descripcion) VALUES
-    ('evento_nombre', 'Semana SST 2025', 'Nombre del evento mostrado en la app'),
-    ('evento_fecha_inicio', '2025-11-17', 'Fecha de inicio (YYYY-MM-DD)'),
-    ('evento_fecha_fin', '2025-11-20', 'Fecha de fin (YYYY-MM-DD)'),
+    ('evento_nombre', 'Semana SST 2026', 'Nombre del evento mostrado en la app'),
+    ('evento_fecha_inicio', '2026-11-17', 'Fecha de inicio (YYYY-MM-DD)'),
+    ('evento_fecha_fin', '2026-11-20', 'Fecha de fin (YYYY-MM-DD)'),
     ('premio_descripcion', 'Premio sorpresa entregado en la sesion de cierre', 'Descripcion del premio'),
     ('crucigrama_intentos_maximos', '3', 'Numero maximo de intentos del crucigrama'),
     ('2fa_validez_minutos', '10', 'Validez en minutos del codigo 2FA'),
@@ -326,19 +326,19 @@ ON CONFLICT (usuario) DO NOTHING;
 -- para el panel administrador.
 -- ============================================================================
 INSERT INTO sst_cronograma (dia, hora_inicio, hora_fin, actividad, descripcion, responsable, ubicacion) VALUES
-    ('2025-11-17', '08:00', '09:00', 'Inauguracion Semana SST', 'Apertura oficial del evento y presentacion del cronograma', 'Comite SST', 'Auditorio principal'),
-    ('2025-11-17', '09:00', '11:00', 'Capacitacion: SG-SST Resolucion 0312', 'Recorrido por los estandares minimos del SG-SST', 'Coordinador SST', 'Auditorio principal'),
-    ('2025-11-18', '10:00', '12:00', 'Taller de bioseguridad clinica', 'Manejo de residuos hospitalarios y prevencion de pinchazos', 'Enfermeria EPS', 'Sala de capacitacion'),
-    ('2025-11-19', '14:00', '16:00', 'Simulacro de evacuacion', 'Practica de evacuacion y uso de extintores', 'Brigada de emergencias', 'Todas las sedes'),
-    ('2025-11-20', '09:00', '11:00', 'Ergonomia en el puesto de trabajo', 'Prevencion de lesiones musculo-esqueleticas', 'Fisioterapeuta', 'Sala multiusos'),
-    ('2025-11-20', '15:00', '17:00', 'Cierre y sorteo del premio', 'Entrega de reconocimientos y sorteo entre participantes', 'Direccion', 'Auditorio principal')
+    ('2026-11-17', '08:00', '09:00', 'Inauguracion Semana SST', 'Apertura oficial del evento y presentacion del cronograma', 'Comite SST', 'Auditorio principal'),
+    ('2026-11-17', '09:00', '11:00', 'Capacitacion: SG-SST Resolucion 0312', 'Recorrido por los estandares minimos del SG-SST', 'Coordinador SST', 'Auditorio principal'),
+    ('2026-11-18', '10:00', '12:00', 'Taller de bioseguridad clinica', 'Manejo de residuos hospitalarios y prevencion de pinchazos', 'Enfermeria EPS', 'Sala de capacitacion'),
+    ('2026-11-19', '14:00', '16:00', 'Simulacro de evacuacion', 'Practica de evacuacion y uso de extintores', 'Brigada de emergencias', 'Todas las sedes'),
+    ('2026-11-20', '09:00', '11:00', 'Ergonomia en el puesto de trabajo', 'Prevencion de lesiones musculo-esqueleticas', 'Fisioterapeuta', 'Sala multiusos'),
+    ('2026-11-20', '15:00', '17:00', 'Cierre y sorteo del premio', 'Entrega de reconocimientos y sorteo entre participantes', 'Direccion', 'Auditorio principal')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- 16. PREMIO POR DEFECTO
 -- ============================================================================
 INSERT INTO sst_premios (nombre, descripcion, estado)
-VALUES ('Premio sorpresa Semana SST 2025', 'Premio sorpresa entregado al visitante ganador de la ruleta durante la sesion de cierre', 'pendiente')
+VALUES ('Premio sorpresa Semana SST 2026', 'Premio sorpresa entregado al visitante ganador de la ruleta durante la sesion de cierre', 'pendiente')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================

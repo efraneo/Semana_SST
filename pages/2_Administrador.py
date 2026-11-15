@@ -672,9 +672,9 @@ def seccion_configuracion():
             evento_nombre = st.text_input("Nombre del evento",
                                            value=config.get("evento_nombre", "Semana SST"))
             fecha_inicio = st.date_input("Fecha inicio",
-                                          value=date.fromisoformat(config.get("evento_fecha_inicio", "2025-11-17")))
+                                          value=date.fromisoformat(config.get("evento_fecha_inicio", "2026-11-17")))
             fecha_fin = st.date_input("Fecha fin",
-                                       value=date.fromisoformat(config.get("evento_fecha_fin", "2025-11-20")))
+                                       value=date.fromisoformat(config.get("evento_fecha_fin", "2026-11-20")))
         with col2:
             premio_desc = st.text_input("Descripcion del premio",
                                           value=config.get("premio_descripcion", ""))

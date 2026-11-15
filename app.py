@@ -35,8 +35,8 @@ styles.render_header("Bienvenidos a la Semana de Salud y Seguridad en el Trabajo
 
 
 # Configuracion del evento
-EVENTO_FECHA_INICIO = "17 de noviembre de 2025"
-EVENTO_FECHA_FIN = "20 de noviembre de 2025"
+EVENTO_FECHA_INICIO = "17 de noviembre de 2026"
+EVENTO_FECHA_FIN = "20 de noviembre de 2026"
 GENIALLY_URL = "https://view.genially.com/6af5dedaba8b594cb3b61fec"
 
 
@@ -164,7 +164,7 @@ def landing():
             Al completar el crucigrama con el 100% de aciertos quedas automaticamente
             inscrito en el <strong>sorteo del premio sorpresa</strong>. La ruleta se
             realizara en vivo durante la sesion de cierre del evento el
-            <strong>20 de noviembre de 2025</strong>, ante todos los participantes,
+            <strong>20 de noviembre de 2026</strong>, ante todos los participantes,
             garantizando transparencia.
         </p>
         <p style="color:#5F6B7A; font-size:0.9rem; margin-top:1rem;">
