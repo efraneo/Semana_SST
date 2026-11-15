@@ -4,8 +4,8 @@ APP PRINCIPAL - Semana SST - Clinica San Rafael Alta Complejidad SAS
 Punto de entrada de Streamlit. Muestra landing estatica (sin conexion a BD)
 con enlaces a las dos rutas: Visitante y Administrador.
 
-El cronograma y el crucigrama solo se cargan dentro de la sesion del
-visitante autenticado, no en la landing publica.
+El crucigrama solo se carga dentro de la sesion del visitante autenticado.
+El cronograma de actividades se visualiza mediante Genially (enlace externo).
 
 Ejecucion: streamlit run app.py
 """
@@ -34,48 +34,25 @@ styles.inject_css()
 styles.render_header("Bienvenidos a la Semana de Salud y Seguridad en el Trabajo")
 
 
-# Cronograma estatico de ejemplo (no requiere conexion a BD)
-# El administrador puede editarlo desde su panel, estos son los valores por defecto
-CRONOGRAMA_ESTATICO = [
-    {"dia": "2025-11-17", "hi": "08:00", "hf": "09:00",
-     "actividad": "Inauguracion Semana SST",
-     "desc": "Apertura oficial del evento y presentacion del cronograma",
-     "responsable": "Comite SST", "ubicacion": "Auditorio principal"},
-    {"dia": "2025-11-17", "hi": "09:00", "hf": "11:00",
-     "actividad": "Capacitacion: SG-SST Resolucion 0312",
-     "desc": "Recorrido por los estandares minimos del SG-SST",
-     "responsable": "Coordinador SST", "ubicacion": "Auditorio principal"},
-    {"dia": "2025-11-18", "hi": "10:00", "hf": "12:00",
-     "actividad": "Taller de bioseguridad clinica",
-     "desc": "Manejo de residuos hospitalarios y prevencion de pinchazos",
-     "responsable": "Enfermeria EPS", "ubicacion": "Sala de capacitacion"},
-    {"dia": "2025-11-19", "hi": "14:00", "hf": "16:00",
-     "actividad": "Simulacro de evacuacion",
-     "desc": "Practica de evacuacion y uso de extintores",
-     "responsable": "Brigada de emergencias", "ubicacion": "Todas las sedes"},
-    {"dia": "2025-11-20", "hi": "09:00", "hf": "11:00",
-     "actividad": "Ergonomia en el puesto de trabajo",
-     "desc": "Prevencion de lesiones musculo-esqueleticas",
-     "responsable": "Fisioterapeuta", "ubicacion": "Sala multiusos"},
-    {"dia": "2025-11-21", "hi": "15:00", "hf": "17:00",
-     "actividad": "Cierre y sorteo del premio",
-     "desc": "Entrega de reconocimientos y sorteo entre participantes",
-     "responsable": "Direccion", "ubicacion": "Auditorio principal"},
-]
+# Configuracion del evento
+EVENTO_FECHA_INICIO = "17 de noviembre de 2025"
+EVENTO_FECHA_FIN = "20 de noviembre de 2025"
+GENIALLY_URL = "https://view.genially.com/6af5dedaba8b594cb3b61fec"
 
 
 def landing():
     """Pantalla principal estatica. No se conecta a Supabase.
-    El cronograma y crucigrama solo se cargan en la sesion autenticada."""
+    El crucigrama solo se carga en la sesion autenticada del visitante."""
 
-    st.markdown("""
+    st.markdown(f"""
     <div class="card">
         <h2 class="card-title">🏥 Bienvenidos a la Semana SST</h2>
         <p style="font-size:1.05rem; color:#1A2332; line-height:1.6;">
             La <strong>Clinica San Rafael Alta Complejidad SAS</strong> da la bienvenida a todos
-            los visitantes a la <strong>Semana de Salud y Seguridad en el Trabajo</strong>.
-            Durante esta semana compartiremos conocimientos clave sobre bioseguridad,
-            normativa SST colombiana y prevencion de riesgos laborales.
+            los visitantes a la <strong>Semana de Salud y Seguridad en el Trabajo</strong>,
+            que se desarrollara del <strong>{EVENTO_FECHA_INICIO}</strong> al
+            <strong>{EVENTO_FECHA_FIN}</strong>. Durante esta semana compartiremos conocimientos
+            clave sobre bioseguridad, normativa SST colombiana y prevencion de riesgos laborales.
         </p>
         <p style="font-size:0.95rem; color:#5F6B7A;">
             Participa en nuestro <strong>crucigrama interactivo de 20 palabras SST</strong> y
@@ -142,40 +119,42 @@ def landing():
         st.markdown(f"""<div class="metric-tile"><div class="value">{resumen['total_letras']}</div>
                      <div class="label">Letras</div></div>""", unsafe_allow_html=True)
 
-    # Cronograma estatico (no consulta a Supabase)
+    # Cronograma de actividades (Genially)
     st.markdown("---")
     st.markdown("""
     <div class="card">
-        <h2 class="card-title">📅 Cronograma del Evento</h2>
-        <p style="color:#5F6B7A; font-size:0.9rem; margin:0 0 0.5rem 0;">
-            Agenda tentativa de la Semana SST.
+        <h2 class="card-title">📅 Cronograma de Actividades</h2>
+        <p style="color:#1A2332;">
+            Consulta la agenda completa de la Semana SST con todos los detalles de
+            cada actividad, responsables y ubicaciones en nuestra presentacion interactiva.
         </p>
     </div>
     """, unsafe_allow_html=True)
-    for item in CRONOGRAMA_ESTATICO:
-        dia = item["dia"]
-        hi = item["hi"]
-        hf = item["hf"]
-        actividad = item["actividad"]
-        desc = item["desc"]
-        responsable = item["responsable"]
-        ubicacion = item["ubicacion"]
-        st.markdown(f"""
-        <div class="card" style="padding:1rem 1.25rem; margin-bottom:0.75rem;">
-            <div style="display:flex; align-items:center; gap:1rem;">
-                <div style="background:#1565C0; color:white; padding:0.5rem 0.85rem;
-                            border-radius:10px; text-align:center; min-width:80px;">
-                    <div style="font-size:0.7rem; opacity:0.9;">DIA</div>
-                    <div style="font-size:1.1rem; font-weight:700;">{dia[-2:]}/{dia[5:7]}</div>
-                </div>
-                <div style="flex:1;">
-                    <div style="font-weight:700; color:#1565C0; font-size:1rem;">{actividad}</div>
-                    <div style="color:#5F6B7A; font-size:0.85rem;">⏰ {hi} - {hf} &middot; 📍 {ubicacion} &middot; 👤 {responsable}</div>
-                    <div style="color:#1A2332; font-size:0.9rem; margin-top:0.3rem;">{desc}</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="text-align:center; margin:1.5rem 0;">
+        <a href="{GENIALLY_URL}" target="_blank" rel="noopener noreferrer"
+           style="display:inline-block; padding:0.85rem 2rem;
+                  background:linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+                  color:white; text-decoration:none; font-weight:600;
+                  border-radius:10px; box-shadow:0 4px 14px rgba(21,101,192,0.30);
+                  transition:all 0.2s ease;">
+            🎨 Ver cronograma interactivo (Genially)
+        </a>
+        <p style="color:#5F6B7A; font-size:0.85rem; margin-top:0.85rem;">
+            Se abrira en una nueva pestana
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Iframe embebido del Genially (vista previa)
+    st.markdown("""
+    <div class="card" style="padding:0.5rem;">
+        <h4 style="color:#0D47A1; margin:0.5rem 0; text-align:center;">
+            🖼️ Vista previa del cronograma
+        </h4>
+    </div>
+    """, unsafe_allow_html=True)
+    st.components.v1.iframe(GENIALLY_URL, height=600, scrolling=True)
 
     # Beneficios e info
     st.markdown("""
@@ -184,8 +163,9 @@ def landing():
         <p style="color:#1A2332; line-height:1.6;">
             Al completar el crucigrama con el 100% de aciertos quedas automaticamente
             inscrito en el <strong>sorteo del premio sorpresa</strong>. La ruleta se
-            realizara en vivo durante la sesion de cierre del evento, ante todos
-            los participantes, garantizando transparencia.
+            realizara en vivo durante la sesion de cierre del evento el
+            <strong>20 de noviembre de 2025</strong>, ante todos los participantes,
+            garantizando transparencia.
         </p>
         <p style="color:#5F6B7A; font-size:0.9rem; margin-top:1rem;">
             📋 Tratamiento de datos: La informacion registrada sera tratada conforme

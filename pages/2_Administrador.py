@@ -674,7 +674,7 @@ def seccion_configuracion():
             fecha_inicio = st.date_input("Fecha inicio",
                                           value=date.fromisoformat(config.get("evento_fecha_inicio", "2025-11-17")))
             fecha_fin = st.date_input("Fecha fin",
-                                       value=date.fromisoformat(config.get("evento_fecha_fin", "2025-11-21")))
+                                       value=date.fromisoformat(config.get("evento_fecha_fin", "2025-11-20")))
         with col2:
             premio_desc = st.text_input("Descripcion del premio",
                                           value=config.get("premio_descripcion", ""))
