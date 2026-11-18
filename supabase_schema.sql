@@ -307,13 +307,13 @@ SELECT
 FROM sst_visitantes;
 
 -- ============================================================================
--- 14. ADMIN POR DEFECTO
--- Usuario: admin / Contrasena: AdminSST2025! (CAMBIAR al primer ingreso)
+-- 14. ADMIN POR DEFECTO (USUARIO MAESTRO)
+-- Usuario: admin / Contrasena: AdminSST2026! (CAMBIAR al primer ingreso)
 -- ============================================================================
 INSERT INTO sst_administradores (usuario, password_hash, nombre_completo, correo, rol)
 VALUES (
     'admin',
-    '$2b$12$t.0Riyi1BjLvjo/49u5hZeMACAXefoDCOm62/zF7J3C44nEUOcghq',
+    '$2b$12$.Noo9R.W0XXt8W0iQ71m9.m1jUBaVvOcEhCF1IrZ4ai.tbDik.ZPi',
     'Administrador Semana SST',
     'admin@clinicasanrafael.com',
     'super_admin'

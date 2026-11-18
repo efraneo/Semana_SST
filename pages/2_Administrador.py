@@ -47,28 +47,76 @@ styles.render_header("Panel de Administracion - Semana SST")
 # ---------------------------------------------------------------------------
 def pantalla_login():
     st.markdown("""
-    <div class="card" style="max-width:480px; margin:2rem auto;">
+    <div class="card" style="max-width:520px; margin:1.5rem auto;">
         <h2 class="card-title">🔐 Acceso de Administrador</h2>
         <p class="card-subtitle">Ingresa tus credenciales para acceder al panel</p>
     </div>
     """, unsafe_allow_html=True)
 
+    # Checkbox para mostrar/ocultar la contrasena
+    mostrar_clave = st.checkbox("👁️ Mostrar contrasena", value=False)
+    tipo_input = "default" if mostrar_clave else "password"
+
     with st.form("form_login_admin"):
-        usuario = st.text_input("Usuario")
-        password = st.text_input("Contrasena", type="password")
-        if st.form_submit_button("Ingresar", use_container_width=True, type="primary"):
-            ok, msg = auth.login(usuario, password)
-            if ok:
-                st.success(msg)
-                time.sleep(0.6)
-                st.rerun()
+        usuario = st.text_input("Usuario", placeholder="admin", autocomplete="username")
+        password = st.text_input("Contrasena", type=tipo_input,
+                                  placeholder="Tu contrasena",
+                                  autocomplete="current-password")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            submit = st.form_submit_button("Ingresar", use_container_width=True, type="primary")
+        with col2:
+            limpiar = st.form_submit_button("Limpiar", use_container_width=True)
+        if submit:
+            if not usuario.strip() or not password:
+                st.error("Debes ingresar usuario y contrasena.")
             else:
-                st.error(msg)
+                ok, msg = auth.login(usuario, password)
+                if ok:
+                    st.success(msg)
+                    time.sleep(0.6)
+                    st.rerun()
+                else:
+                    st.error(msg)
+                    # Pista para admin maestro si esta intentando con 'admin'
+                    if usuario.strip().lower() == "admin":
+                        st.markdown("""
+                        <div class="alert-warning" style="margin-top:0.5rem;">
+                            <strong>💡 Credenciales maestras por defecto:</strong><br>
+                            Usuario: <code>admin</code><br>
+                            Contrasena: <code>AdminSST2026!</code><br><br>
+                            <em>Si acabas de ejecutar el SQL del esquema, estas son las credenciales
+                            que se crearon automaticamente. Cambialas despues del primer ingreso.</em>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+    # Caja con info de credenciales maestras (colapsable)
+    with st.expander("🔑 ¿Olvidaste tu contrasena? Ver credenciales maestras por defecto"):
+        st.markdown("""
+        <div class="alert-info">
+            <strong>Usuario administrador maestro (creado al ejecutar el SQL):</strong>
+            <table style="width:100%; margin-top:0.5rem;">
+                <tr>
+                    <td style="padding:0.3rem 0.6rem; background:#F5F7FA; border-radius:6px; font-weight:bold;">Usuario</td>
+                    <td style="padding:0.3rem 0.6rem;"><code>admin</code></td>
+                </tr>
+                <tr>
+                    <td style="padding:0.3rem 0.6rem; background:#F5F7FA; border-radius:6px; font-weight:bold;">Contrasena</td>
+                    <td style="padding:0.3rem 0.6rem;"><code>AdminSST2026!</code></td>
+                </tr>
+            </table>
+            <p style="margin-top:0.75rem; font-size:0.85rem; color:#5F6B7A;">
+                Estas credenciales funcionan <strong>solo si</strong> ejecutaste el archivo
+                <code>supabase_schema.sql</code> en el SQL Editor de Supabase. Si ya las
+                cambiaste desde el panel, usa tu nueva contrasena.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="alert-info" style="max-width:480px; margin:1rem auto;">
+    <div class="alert-info" style="max-width:520px; margin:1rem auto;">
         <strong>Primera vez?</strong> Ejecuta el script <code>crear_admin.py</code> para
-        generar tu usuario administrador con un hash bcrypt valido.
+        crear un administrador personalizado, o usa las credenciales maestras de arriba.
     </div>
     """, unsafe_allow_html=True)
 
@@ -122,22 +170,91 @@ def seccion_dashboard():
         st.error(f"Error cargando datos: {e}")
         return
 
-    m1, m2, m3, m4, m5 = st.columns(5)
+    # Calcular faltantes por verificar
+    total_registrados = stats.get('total_registrados', 0)
+    total_validados = stats.get('total_validados', 0)
+    faltantes_verificar = total_registrados - total_validados
+    total_crucigrama_ok = stats.get('total_crucigrama_ok', 0)
+    total_habeas = stats.get('total_habeas_data', 0)
+    total_empresas = stats.get('total_empresas', 0)
+    # Progreso de verificacion (porcentaje)
+    pct_validados = int(round((total_validados / total_registrados) * 100)) if total_registrados else 0
+
+    # ---- Tarjetas de metricas principales ----
+    st.markdown("""
+    <div class="card">
+        <h3 style="color:#0D47A1; margin-top:0;">📈 Resumen de registrados</h3>
+        <p style="color:#5F6B7A; font-size:0.9rem; margin:0 0 1rem 0;">
+            Estado actual del proceso de registro y verificacion de visitantes.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Fila 1: metricas principales con enfasis en registrados y faltantes
+    m1, m2, m3 = st.columns(3)
     with m1:
-        st.markdown(f"""<div class="metric-tile"><div class="value">{stats['total_registrados']}</div>
-                     <div class="label">Registrados</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-tile" style="background:linear-gradient(135deg,#E3F2FD,#FFFFFF);
+                    border:2px solid #1565C0;">
+            <div class="value" style="color:#1565C0;">{total_registrados}</div>
+            <div class="label" style="color:#0D47A1;">REGISTRADOS</div>
+        </div>
+        """, unsafe_allow_html=True)
     with m2:
-        st.markdown(f"""<div class="metric-tile"><div class="value">{stats['total_validados']}</div>
-                     <div class="label">Email validados</div></div>""", unsafe_allow_html=True)
+        color_falt = "#C62828" if faltantes_verificar > 0 else "#2E7D32"
+        bg_falt = "#FFEBEE" if faltantes_verificar > 0 else "#E8F5E9"
+        st.markdown(f"""
+        <div class="metric-tile" style="background:linear-gradient(135deg,{bg_falt},#FFFFFF);
+                    border:2px solid {color_falt};">
+            <div class="value" style="color:{color_falt};">{faltantes_verificar}</div>
+            <div class="label" style="color:{color_falt};">FALTANTES POR VERIFICAR</div>
+        </div>
+        """, unsafe_allow_html=True)
     with m3:
-        st.markdown(f"""<div class="metric-tile"><div class="value">{stats['total_crucigrama_ok']}</div>
-                     <div class="label">Crucigrama OK</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-tile" style="background:linear-gradient(135deg,#E8F5E9,#FFFFFF);
+                    border:2px solid #2E7D32;">
+            <div class="value" style="color:#2E7D32;">{total_validados}</div>
+            <div class="label" style="color:#2E7D32;">EMAIL VERIFICADOS ({pct_validados}%)</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Barra de progreso visual
+    st.markdown(f"""
+    <div class="card" style="padding:1rem 1.25rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <strong style="color:#0D47A1;">Progreso de verificacion</strong>
+            <span style="color:#5F6B7A;">{total_validados} / {total_registrados} ({pct_validados}%)</span>
+        </div>
+        <div style="background:#E1E5EB; border-radius:8px; height:24px; overflow:hidden;">
+            <div style="background:linear-gradient(90deg,#2E7D32,#66BB6A);
+                        height:100%; width:{pct_validados}%;
+                        border-radius:8px; transition:width 0.4s ease;
+                        display:flex; align-items:center; justify-content:flex-end;
+                        padding-right:8px; color:white; font-size:0.75rem; font-weight:700;">
+                {pct_validados}%
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Fila 2: metricas secundarias
+    st.markdown('<div style="margin-top:1rem;"></div>', unsafe_allow_html=True)
+    m4, m5, m6, m7 = st.columns(4)
     with m4:
-        st.markdown(f"""<div class="metric-tile"><div class="value">{stats['total_habeas_data']}</div>
-                     <div class="label">Habeas Data</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div class="metric-tile"><div class="value" style="color:#2E7D32;">{total_crucigrama_ok}</div>
+                     <div class="label">Crucigrama OK</div></div>""", unsafe_allow_html=True)
     with m5:
-        st.markdown(f"""<div class="metric-tile"><div class="value">{stats['total_empresas']}</div>
+        st.markdown(f"""<div class="metric-tile"><div class="value">{total_habeas}</div>
+                     <div class="label">Habeas Data</div></div>""", unsafe_allow_html=True)
+    with m6:
+        st.markdown(f"""<div class="metric-tile"><div class="value">{total_empresas}</div>
                      <div class="label">Empresas</div></div>""", unsafe_allow_html=True)
+    with m7:
+        # Visitantes que iniciaron crucigrama pero no completaron
+        en_progreso = max(0, total_validados - total_crucigrama_ok)
+        st.markdown(f"""<div class="metric-tile"><div class="value" style="color:#ED6C02;">{en_progreso}</div>
+                     <div class="label">En progreso</div></div>""", unsafe_allow_html=True)
 
     # Estado del premio
     st.markdown("---")
@@ -155,7 +272,7 @@ def seccion_dashboard():
                 <h4>{p.get('nombre', 'Premio sorpresa')}</h4>
                 <p style="color:#5F6B7A;">{p.get('descripcion', '')}</p>
                 <span class="badge {badge_cls}">{estado.upper()}</span>
-                <span class="badge badge-info">{stats['total_crucigrama_ok']} participantes elegibles</span>
+                <span class="badge badge-info">{total_crucigrama_ok} participantes elegibles</span>
             </div>
             """, unsafe_allow_html=True)
         else:
