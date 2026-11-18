@@ -312,6 +312,25 @@ def paso_2fa():
 
 def _enviar_codigo_2fa():
     """Genera, envia y guarda el codigo 2FA."""
+    # Validar que el correo del visitante este definido
+    correo = st.session_state.get("visitante_correo") or ""
+    if not correo or not isinstance(correo, str):
+        # Intentar recargar el correo desde la BD usando el ID
+        visitante_id = st.session_state.get("visitante_id")
+        if visitante_id:
+            try:
+                v = database.obtener_visitante(visitante_id)
+                if v and v.get("correo"):
+                    st.session_state.visitante_correo = v["correo"]
+                    correo = v["correo"]
+            except Exception:
+                pass
+    if not correo:
+        raise RuntimeError(
+            "No se encontro el correo del visitante. "
+            "Por favor vuelve a iniciar el registro."
+        )
+
     codigo = email_service.generar_codigo_otp(6)
     codigo_hash = email_service.hashear_codigo(codigo)
     # Guardar en DB
@@ -323,14 +342,14 @@ def _enviar_codigo_2fa():
     validez = int(cfg.get("2fa_validez_minutos", "10") or 10)
     database.guardar_codigo_2fa(
         st.session_state.visitante_id,
-        st.session_state.visitante_correo,
+        correo,
         codigo_hash,
         validez_minutos=validez,
     )
     # Enviar correo
     email_service.enviar_codigo_2fa(
-        st.session_state.visitante_correo, codigo,
-        nombre=st.session_state.visitante_nombre,
+        correo, codigo,
+        nombre=st.session_state.get("visitante_nombre", "") or "",
     )
     # Guardar id del codigo mas reciente
     codigo_db = database.verificar_codigo_2fa(st.session_state.visitante_id)

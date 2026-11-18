@@ -96,13 +96,23 @@ def crear_visitante(datos: dict) -> dict:
 
 def buscar_visitante_por_cedula(cedula: str) -> Optional[dict]:
     sb = get_client()
-    r = sb.table("sst_visitantes").select("*").eq("cedula", str(cedula).strip()).execute()
+    if cedula is None:
+        return None
+    cedula = str(cedula).strip()
+    if not cedula:
+        return None
+    r = sb.table("sst_visitantes").select("*").eq("cedula", cedula).execute()
     return r.data[0] if r.data else None
 
 
 def buscar_visitante_por_correo(correo: str) -> Optional[dict]:
     sb = get_client()
-    r = sb.table("sst_visitantes").select("*").eq("correo", correo.strip().lower()).execute()
+    if correo is None:
+        return None
+    correo = str(correo).strip().lower()
+    if not correo:
+        return None
+    r = sb.table("sst_visitantes").select("*").eq("correo", correo).execute()
     return r.data[0] if r.data else None
 
 
