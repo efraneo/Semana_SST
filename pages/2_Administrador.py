@@ -14,8 +14,8 @@ from __future__ import annotations
 import sys
 import os
 import secrets as pysecrets
-import time
-from datetime import datetime, date, timedelta
+import time as time_module
+from datetime import datetime, date, time, timedelta
 
 # Agregar la carpeta sst_app/ al path para imports directos
 _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -74,7 +74,7 @@ def pantalla_login():
                 ok, msg = auth.login(usuario, password)
                 if ok:
                     st.success(msg)
-                    time.sleep(0.6)
+                    time_module.sleep(0.6)
                     st.rerun()
                 else:
                     st.error(msg)
@@ -427,7 +427,7 @@ def _form_editar_visitante(v: dict):
                                             "edit_visitante", detalle=v["id"],
                                             exitoso=True)
                 st.success("Cambios guardados correctamente.")
-                time.sleep(0.8)
+                time_module.sleep(0.8)
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -443,7 +443,7 @@ def _confirmar_eliminar(v: dict):
                                        "delete_visitante",
                                        detalle=v.get("cedula", ""), exitoso=True)
             st.success("Visitante eliminado.")
-            time.sleep(0.8)
+            time_module.sleep(0.8)
             st.rerun()
         except Exception as e:
             st.error(f"Error: {e}")
@@ -465,7 +465,7 @@ def _marcar_crucigrama(v: dict):
                                            "mark_crucigrama_ok", detalle=v["id"],
                                            exitoso=True)
                 st.success("Marcado como completado.")
-                time.sleep(0.8)
+                time_module.sleep(0.8)
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -564,7 +564,7 @@ def seccion_cronograma():
                         "ubicacion": ubicacion,
                     })
                     st.success("Actividad agregada.")
-                    time.sleep(0.6)
+                    time_module.sleep(0.6)
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -581,7 +581,7 @@ def seccion_cronograma():
             try:
                 database.eliminar_cronograma(items[idx]["id"])
                 st.success("Actividad eliminada.")
-                time.sleep(0.6)
+                time_module.sleep(0.6)
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -739,7 +739,7 @@ def _ejecutar_sorteo(participantes: list, premios: list, admin: dict):
         </div>
     </div>
     """, unsafe_allow_html=True)
-    time.sleep(1.5)
+    time_module.sleep(1.5)
     st.rerun()
 
 
@@ -810,7 +810,7 @@ def seccion_configuracion():
                 database.actualizar_configuracion("crucigrama_intentos_maximos", str(intentos_max))
                 database.actualizar_configuracion("2fa_validez_minutos", str(validez_2fa))
                 st.success("Configuracion guardada.")
-                time.sleep(0.6)
+                time_module.sleep(0.6)
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -839,7 +839,7 @@ def seccion_configuracion():
                                 "nombre": nombre, "descripcion": descripcion, "estado": estado,
                             })
                             st.success("Premio actualizado.")
-                            time.sleep(0.6)
+                            time_module.sleep(0.6)
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
@@ -857,7 +857,7 @@ def seccion_configuracion():
                             "nombre": nombre, "descripcion": descripcion, "estado": "pendiente",
                         }).execute()
                         st.success("Premio creado.")
-                        time.sleep(0.6)
+                        time_module.sleep(0.6)
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -870,19 +870,66 @@ def seccion_password():
     st.markdown('<h2 class="card-title">🔑 Cambiar mi contrasena</h2>',
                 unsafe_allow_html=True)
     admin = auth.get_current_admin()
+    if not admin:
+        st.error("Sesion no valida. Vuelve a iniciar sesion.")
+        return
+
+    st.markdown(f"""
+    <div class="alert-info">
+        Cambiando la contrasena del usuario: <strong>@{admin.get('usuario', '')}</strong>
+        ({admin.get('nombre_completo', '')})
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Checkbox para mostrar/ocultar
+    mostrar = st.checkbox("👁️ Mostrar contrasenas", value=False)
+    tipo = "default" if mostrar else "password"
+
     with st.form("form_password"):
-        actual = st.text_input("Contrasena actual", type="password")
-        nueva = st.text_input("Nueva contrasena", type="password")
-        confirmar = st.text_input("Confirmar nueva contrasena", type="password")
-        if st.form_submit_button("Cambiar contrasena", type="primary"):
+        actual = st.text_input("Contrasena actual *", type=tipo, autocomplete="current-password")
+        nueva = st.text_input("Nueva contrasena * (minimo 8 caracteres)", type=tipo,
+                               autocomplete="new-password")
+        confirmar = st.text_input("Confirma la nueva contrasena *", type=tipo,
+                                    autocomplete="new-password")
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            submit = st.form_submit_button("🔄 Cambiar contrasena",
+                                            use_container_width=True, type="primary")
+        with col2:
+            limpiar = st.form_submit_button("Limpiar", use_container_width=True)
+
+        if submit:
+            if not actual or not nueva or not confirmar:
+                st.error("Debes completar todos los campos.")
+                return
             if nueva != confirmar:
-                st.error("Las contrasenas nuevas no coinciden.")
+                st.error("Las contrasenas nuevas no coinciden. Vuelve a escribirlas.")
+                return
+            if len(nueva) < 8:
+                st.error("La nueva contrasena debe tener al menos 8 caracteres.")
+                return
+            if nueva == actual:
+                st.error("La nueva contrasena no puede ser igual a la actual.")
                 return
             ok, msg = auth.cambiar_password(admin.get("usuario", ""), actual, nueva)
             if ok:
                 st.success(msg)
+                st.balloons()
             else:
                 st.error(msg)
+
+    st.markdown("---")
+    st.markdown("""
+    <div class="alert-warning">
+        <strong>💡 Recomendaciones de seguridad:</strong>
+        <ul style="margin:0.5rem 0; padding-left:1.2rem;">
+            <li>Usa al menos 8 caracteres</li>
+            <li>Combina mayusculas, minusculas, numeros y simbolos</li>
+            <li>No reutilices contrasenas de otros servicios</li>
+            <li>Cambiala periodicamente (cada 3 meses)</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -909,7 +956,7 @@ def main():
         seccion_ganadores()
     elif "Configuracion" in seccion:
         seccion_configuracion()
-    elif "Contrasena" in seccion:
+    elif "contrasena" in seccion.lower() or "Contrasena" in seccion:
         seccion_password()
     styles.render_footer()
 
